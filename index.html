@@ -361,6 +361,63 @@ footer.credit{margin-top:40px;text-align:center;color:var(--gray-dim);font-size:
 .comment-form button{background:var(--blue-500);border:none;color:#fff;border-radius:8px;padding:8px 12px;font-size:12.5px;font-weight:700;}
 .comments-toggle{background:none;border:none;color:var(--blue-300);font-size:12px;font-weight:600;padding:0;margin-top:4px;}
 
+/* ---------- Dashboard clickable stat cards ---------- */
+.stat-card.clickable{cursor:pointer;transition:.15s;}
+.stat-card.clickable:hover{border-color:var(--blue-500);transform:translateY(-2px);}
+
+/* ---------- Player card clickable ---------- */
+.player-card{cursor:pointer;}
+.player-card .avatar{overflow:hidden;}
+.player-card .avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+
+/* ---------- Ficha del jugador (modal grande) ---------- */
+.modal.ficha{max-width:560px;}
+.ficha-photo-row{display:flex;align-items:center;gap:16px;}
+.ficha-avatar{
+  width:84px;height:84px;border-radius:50%;flex-shrink:0;object-fit:cover;
+  background:linear-gradient(135deg,var(--blue-700),var(--blue-500));
+  display:flex;align-items:center;justify-content:center;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:26px;
+  border:2px solid var(--line);position:relative;
+}
+.ficha-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+.ficha-photo-actions{display:flex;flex-direction:column;gap:8px;}
+.ficha-photo-actions input[type=file]{display:none;}
+.ficha-stats-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.ficha-stat{background:var(--bg-raised);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;}
+.ficha-stat .v{font-family:'Rajdhani',sans-serif;font-size:26px;font-weight:700;}
+.ficha-stat .l{font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:.05em;margin-top:2px;}
+.ficha-stat .stepper{display:flex;justify-content:center;gap:8px;margin-top:8px;}
+.ficha-stat .stepper button{width:26px;height:26px;border-radius:7px;background:var(--bg-panel);border:1px solid var(--line);color:var(--white);font-weight:700;}
+.ficha-readonly{font-size:14px;color:var(--white);padding:10px 12px;background:var(--bg-raised);border-radius:9px;border:1px solid var(--line);}
+
+/* ---------- Registro de nuevo jugador (identity screen) ---------- */
+.identity-secondary{margin-top:14px;font-size:12.5px;color:var(--gray-dim);}
+.identity-link{background:none;border:none;color:var(--blue-300);font-weight:700;font-size:12.5px;}
+
+/* ---------- Formation mode toggle ---------- */
+.mode-toggle{display:flex;gap:0;border:1px solid var(--line);border-radius:9px;overflow:hidden;}
+.mode-toggle button{background:var(--bg-raised);border:none;color:var(--gray);padding:9px 14px;font-size:13px;font-weight:700;}
+.mode-toggle button.active{background:var(--blue-500);color:#fff;}
+
+/* ---------- Responsive fixes ---------- */
+body{overflow-x:hidden;}
+.table-scroll{overflow-x:auto;}
+@media(max-width:600px){
+  .main{padding:14px 12px 50px;}
+  .card{padding:14px;}
+  .topbar h1{font-size:21px;}
+  .player-grid{grid-template-columns:1fr 1fr;gap:10px;}
+  .search{min-width:0;}
+  .mode-banner{flex-direction:column;align-items:flex-start;}
+  .pitch-wrap{gap:14px;}
+  .bench-panel{min-width:0;width:100%;}
+  .identity-card img{width:60px;height:60px;}
+  .ficha-photo-row{flex-direction:column;align-items:flex-start;}
+}
+@media(max-width:380px){
+  .player-grid{grid-template-columns:1fr;}
+}
+
 /* ---------- Mobile ---------- */
 @media(max-width:880px){
   .sidebar{position:fixed;left:-260px;top:0;transition:left .2s;box-shadow:0 0 40px rgba(0,0,0,.6);}
@@ -500,6 +557,10 @@ footer.credit{margin-top:40px;text-align:center;color:var(--gray-dim);font-size:
         🔒 Solo el coach puede modificar la formación. La estás viendo en modo lectura.
       </div>
       <div class="formation-controls coach-only" id="formationControls">
+        <div class="mode-toggle" id="modeToggle">
+          <button data-mode="7" class="active">7 vs 7</button>
+          <button data-mode="11">11 vs 11</button>
+        </div>
         <select class="filter" id="formationType"></select>
         <select class="filter" id="formationEvent"><option value="">— sin asociar a un partido —</option></select>
         <button class="btn secondary" id="clearFormationBtn">Vaciar tablero</button>
@@ -540,7 +601,7 @@ footer.credit{margin-top:40px;text-align:center;color:var(--gray-dim);font-size:
         <select class="filter" id="attendanceEventSelect"></select>
       </div>
       <div class="att-summary" id="attSummary"></div>
-      <div class="card">
+      <div class="card table-scroll">
         <table class="att-table" id="attTable"><tbody></tbody></table>
       </div>
     </section>
@@ -560,10 +621,19 @@ footer.credit{margin-top:40px;text-align:center;color:var(--gray-dim);font-size:
 
 <!-- MODALS -->
 <div class="overlay" id="playerModal">
-  <div class="modal">
+  <div class="modal ficha">
     <div class="modal-head"><h3 id="playerModalTitle">Nuevo jugador</h3><button class="modal-close" data-close>&times;</button></div>
     <div class="modal-body">
       <input type="hidden" id="playerId">
+
+      <div class="ficha-photo-row" id="fichaPhotoRow" style="display:none;">
+        <div class="ficha-avatar" id="fichaAvatar"></div>
+        <div class="ficha-photo-actions" id="fichaPhotoActions">
+          <label class="btn secondary sm" for="fichaPhotoInput" style="cursor:pointer;text-align:center;">📷 Cambiar foto</label>
+          <input type="file" id="fichaPhotoInput" accept="image/*" capture="environment">
+        </div>
+      </div>
+
       <div class="field"><label>Nombre completo</label><input id="pName" placeholder="Ej. Carlos Martínez"></div>
       <div class="field-row">
         <div class="field"><label>Número de camiseta</label><input id="pNumber" type="number" min="0" max="99" placeholder="10"></div>
@@ -573,15 +643,30 @@ footer.credit{margin-top:40px;text-align:center;color:var(--gray-dim);font-size:
           </select>
         </div>
       </div>
+      <div class="field-row">
+        <div class="field"><label>Fecha de nacimiento</label><input id="pDob" type="date"></div>
+        <div class="field"><label>Estatura (cm)</label><input id="pHeight" type="number" min="100" max="230" placeholder="175"></div>
+      </div>
       <div class="field"><label>Teléfono</label><input id="pPhone" placeholder="(509) 555-0123"></div>
       <div class="field"><label>Correo electrónico</label><input id="pEmail" placeholder="jugador@correo.com"></div>
-      <div class="field"><label>Notas (lesiones, disponibilidad, etc.)</label><textarea id="pNotes" placeholder="Opcional"></textarea></div>
+      <div class="field"><label>Notas / comentario</label><textarea id="pNotes" placeholder="Opcional"></textarea></div>
       <div class="field check"><input type="checkbox" id="pActive" checked><label style="text-transform:none;font-weight:500;">Jugador activo esta temporada</label></div>
+
+      <div class="ficha-stats-row" id="fichaStatsRow" style="display:none;">
+        <div class="ficha-stat">
+          <div class="v" id="statGoals">0</div><div class="l">Goles</div>
+          <div class="stepper" id="statGoalsStepper"><button data-stat="goals" data-delta="-1">−</button><button data-stat="goals" data-delta="1">+</button></div>
+        </div>
+        <div class="ficha-stat">
+          <div class="v" id="statAssists">0</div><div class="l">Asistencias</div>
+          <div class="stepper" id="statAssistsStepper"><button data-stat="assists" data-delta="-1">−</button><button data-stat="assists" data-delta="1">+</button></div>
+        </div>
+      </div>
     </div>
     <div class="modal-foot">
       <button class="btn danger" id="deletePlayerBtn" style="display:none;margin-right:auto;">Eliminar</button>
-      <button class="btn secondary" data-close>Cancelar</button>
-      <button class="btn" id="savePlayerBtn">Guardar</button>
+      <button class="btn secondary" data-close>Cerrar</button>
+      <button class="btn" id="savePlayerBtn" style="display:none;">Guardar</button>
     </div>
   </div>
 </div>
@@ -693,10 +778,38 @@ let state = {
   comments: [], formations: [], formationAssignments: [],
   seasons: [], profiles: [], myProfile: null,
 };
-let currentFormationDraft = { type:'4-4-2', formationId:null }; // borrador en pantalla, se persiste al "Guardar"
+let currentFormationMode = '7'; // '7' = 7 vs 7 (por defecto), '11' = 11 vs 11
+let currentFormationDraft = { type:'2-3-1', formationId:null }; // borrador en pantalla, se persiste al "Guardar"
 let pendingSlot = null;
 
-const FORMATIONS = {
+const FORMATIONS_7 = {
+  '2-3-1': [
+    {id:'gk',label:'POR',x:50,y:92},
+    {id:'d1',label:'DEF',x:30,y:74},{id:'d2',label:'DEF',x:70,y:74},
+    {id:'m1',label:'MED',x:18,y:48},{id:'m2',label:'MED',x:50,y:52},{id:'m3',label:'MED',x:82,y:48},
+    {id:'f1',label:'DEL',x:50,y:18},
+  ],
+  '3-2-1': [
+    {id:'gk',label:'POR',x:50,y:92},
+    {id:'d1',label:'DEF',x:20,y:76},{id:'d2',label:'DEF',x:50,y:80},{id:'d3',label:'DEF',x:80,y:76},
+    {id:'m1',label:'MED',x:32,y:50},{id:'m2',label:'MED',x:68,y:50},
+    {id:'f1',label:'DEL',x:50,y:18},
+  ],
+  '2-2-2': [
+    {id:'gk',label:'POR',x:50,y:92},
+    {id:'d1',label:'DEF',x:30,y:76},{id:'d2',label:'DEF',x:70,y:76},
+    {id:'m1',label:'MED',x:30,y:50},{id:'m2',label:'MED',x:70,y:50},
+    {id:'f1',label:'DEL',x:30,y:20},{id:'f2',label:'DEL',x:70,y:20},
+  ],
+  '3-1-2': [
+    {id:'gk',label:'POR',x:50,y:92},
+    {id:'d1',label:'DEF',x:20,y:76},{id:'d2',label:'DEF',x:50,y:80},{id:'d3',label:'DEF',x:80,y:76},
+    {id:'m1',label:'MED',x:50,y:52},
+    {id:'f1',label:'DEL',x:32,y:20},{id:'f2',label:'DEL',x:68,y:20},
+  ],
+};
+
+const FORMATIONS_11 = {
   '4-4-2': [
     {id:'gk',label:'POR',x:50,y:92},
     {id:'d1',label:'DEF',x:14,y:74},{id:'d2',label:'DEF',x:38,y:78},{id:'d3',label:'DEF',x:62,y:78},{id:'d4',label:'DEF',x:86,y:74},
@@ -729,6 +842,10 @@ const FORMATIONS = {
     {id:'f1',label:'DEL',x:16,y:20},{id:'f2',label:'DEL',x:50,y:15},{id:'f3',label:'DEL',x:84,y:20},
   ],
 };
+
+function formationSetFor(mode){ return mode==='11' ? FORMATIONS_11 : FORMATIONS_7; }
+function getFormationSlots(type){ return FORMATIONS_7[type] || FORMATIONS_11[type] || []; }
+function modeOfFormationType(type){ return FORMATIONS_7[type] ? '7' : '11'; }
 
 /* ---------- 3. Utilidades ---------- */
 function isCoach(){ return state.myProfile && state.myProfile.role === 'coach'; }
@@ -781,29 +898,69 @@ async function loadRosterForIdentity(){
     return;
   }
 
+  renderIdentityRoster(players);
+}
+
+function renderIdentityRoster(players){
   document.getElementById('identityContent').innerHTML = `
     <div class="identity-list">
       ${players.map(p=>`<button class="identity-btn" data-pid="${p.id}"><span class="num">${p.jersey_number ?? '-'}</span>${escapeHtml(p.full_name)}<span style="margin-left:auto;color:var(--gray-dim);font-size:11px;">${p.position||''}</span></button>`).join('')}
     </div>
     <button class="identity-coach-btn" id="identityCoachBtn">Soy el Coach</button>
+    <div class="identity-secondary">¿Eres nuevo en el equipo? <button class="identity-link" id="identityRegisterBtn">Regístrate aquí</button></div>
   `;
   document.querySelectorAll('.identity-btn').forEach(btn=>{
-    btn.addEventListener('click', ()=>createProfile({ player_id: btn.dataset.pid, display_name: btn.textContent.trim(), role:'player' }));
+    btn.addEventListener('click', async ()=>{
+      const profile = await createProfile({ player_id: btn.dataset.pid, display_name: btn.textContent.trim(), role:'player' });
+      if(profile) enterApp();
+    });
   });
   document.getElementById('identityCoachBtn').addEventListener('click', ()=>{
+    document.getElementById('identitySubtitle').textContent = 'Ingresa el PIN que te dio el coach.';
     document.getElementById('identityContent').innerHTML = `
       <div class="field" style="text-align:left;"><label>PIN del coach</label><input id="identityPinInput" type="password" inputmode="numeric" placeholder="••••"></div>
-      <div id="identityPinError" style="color:var(--danger);font-size:12.5px;display:none;margin-bottom:10px;">PIN incorrecto.</div>
+      <div id="identityPinError" style="color:var(--danger);font-size:12.5px;display:none;margin-bottom:10px;"></div>
       <button class="identity-coach-btn" id="identityPinConfirm">Entrar como Coach</button>
+      <div class="identity-secondary"><button class="identity-link" id="identityBackBtn">← Volver</button></div>
     `;
+    document.getElementById('identityBackBtn').addEventListener('click', ()=>renderIdentityRoster(players));
     document.getElementById('identityPinConfirm').addEventListener('click', async ()=>{
       const pin = document.getElementById('identityPinInput').value.trim();
       if(!pin) return;
-      await createProfile({ player_id:null, display_name:'Coach', role:'player' }); // crea el perfil primero como 'player'
-      const ok = await tryVerifyPin(pin);
-      if(!ok){ document.getElementById('identityPinError').style.display=''; return; }
-      await loadAll();
+      const profile = await createProfile({ player_id:null, display_name:'Coach', role:'player' }); // se crea como 'player'; el PIN lo eleva a 'coach'
+      if(!profile) return;
+      const result = await tryVerifyPin(pin);
+      const errBox = document.getElementById('identityPinError');
+      if(!result.ok){ errBox.textContent = result.message; errBox.style.display=''; return; }
       enterApp();
+    });
+  });
+  document.getElementById('identityRegisterBtn').addEventListener('click', ()=>{
+    document.getElementById('identitySubtitle').textContent = 'Regístrate para unirte al equipo.';
+    document.getElementById('identityContent').innerHTML = `
+      <div class="field" style="text-align:left;"><label>Nombre completo</label><input id="regName" placeholder="Tu nombre"></div>
+      <div class="field-row" style="text-align:left;">
+        <div class="field"><label>Número (opcional)</label><input id="regNumber" type="number" min="0" max="99"></div>
+        <div class="field"><label>Posición</label>
+          <select id="regPosition"><option>Portero</option><option>Defensa</option><option selected>Mediocampista</option><option>Delantero</option></select>
+        </div>
+      </div>
+      <button class="identity-coach-btn" id="identityRegisterConfirm">Unirme al equipo</button>
+      <div class="identity-secondary"><button class="identity-link" id="identityBackBtn2">← Volver</button></div>
+    `;
+    document.getElementById('identityBackBtn2').addEventListener('click', ()=>renderIdentityRoster(players));
+    document.getElementById('identityRegisterConfirm').addEventListener('click', async ()=>{
+      const full_name = document.getElementById('regName').value.trim();
+      if(!full_name){ toast('Escribe tu nombre.'); return; }
+      const { data: newPlayer, error } = await sb.from('players').insert({
+        full_name,
+        jersey_number: document.getElementById('regNumber').value ? Number(document.getElementById('regNumber').value) : null,
+        position: document.getElementById('regPosition').value,
+        active: true,
+      }).select().single();
+      if(error){ toast('No se pudo registrar: '+error.message); return; }
+      const profile = await createProfile({ player_id: newPlayer.id, display_name: full_name, role:'player' });
+      if(profile) enterApp();
     });
   });
 }
@@ -813,10 +970,10 @@ async function createProfile({player_id, display_name, role}){
   const { data, error } = await sb.from('profiles').insert({
     auth_user_id: user.id, player_id, display_name, role
   }).select().single();
-  if(error){ toast('No se pudo crear tu perfil: '+error.message); return; }
+  if(error){ toast('No se pudo crear tu perfil: '+error.message); return null; }
   state.myProfile = data;
   await loadAll();
-  enterApp();
+  return data;
 }
 
 async function enterApp(){
@@ -831,12 +988,19 @@ async function enterApp(){
 /* ---------- 5. PIN del coach (validado en el servidor, vía Edge Function) ---------- */
 async function tryVerifyPin(pin){
   const { data, error } = await sb.functions.invoke('verify-pin', { body: { pin } });
-  if(error || !data || !data.success) return false;
+  if(error){
+    console.error('verify-pin: error de red/función', error);
+    return { ok:false, message:'No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.' };
+  }
+  if(!data || !data.success){
+    console.warn('verify-pin: rechazado', data);
+    return { ok:false, message: (data && data.error) ? data.error : 'No se pudo validar el PIN.' };
+  }
   // refresca mi perfil (ya debería tener role='coach')
   const { data: { user } } = await sb.auth.getUser();
   const { data: profile } = await sb.from('profiles').select('*').eq('auth_user_id', user.id).single();
   state.myProfile = profile;
-  return true;
+  return { ok:true };
 }
 document.getElementById('coachUnlockBtn').addEventListener('click', ()=>{
   document.getElementById('coachPinInput').value='';
@@ -846,8 +1010,9 @@ document.getElementById('coachUnlockBtn').addEventListener('click', ()=>{
 document.getElementById('confirmPinBtn').addEventListener('click', async ()=>{
   const pin = document.getElementById('coachPinInput').value.trim();
   if(!pin) return;
-  const ok = await tryVerifyPin(pin);
-  if(!ok){ document.getElementById('pinError').style.display=''; return; }
+  const result = await tryVerifyPin(pin);
+  const errBox = document.getElementById('pinError');
+  if(!result.ok){ errBox.textContent = result.message; errBox.style.display=''; return; }
   closeAllModals();
   updateModeBanner();
   render();
@@ -953,23 +1118,26 @@ function renderDashboard(){
   const totalAttConfirmed = state.attendance.filter(a=>a.status==='attending').length;
 
   document.getElementById('statCards').innerHTML = `
-    <div class="card stat-card">
+    <div class="card stat-card clickable" data-goto="players">
       <div class="icon" style="background:rgba(59,111,242,.15);color:var(--blue-300);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/></svg></div>
       <div class="n">${activePlayers().length}</div><div class="l">Jugadores activos</div>
     </div>
-    <div class="card stat-card">
+    <div class="card stat-card clickable" data-goto="events">
       <div class="icon" style="background:rgba(47,209,146,.15);color:var(--success);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18"/></svg></div>
       <div class="n">${upcoming.length}</div><div class="l">Próximos eventos</div>
     </div>
-    <div class="card stat-card">
+    <div class="card stat-card clickable" data-goto="attendance">
       <div class="icon" style="background:rgba(246,167,35,.15);color:var(--warning);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
       <div class="n">${totalAttConfirmed}</div><div class="l">Confirmaciones "asiste"</div>
     </div>
-    <div class="card stat-card">
+    <div class="card stat-card clickable" data-goto="announcements">
       <div class="icon" style="background:rgba(239,74,95,.12);color:var(--danger);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l17-7-6 18-4-8-7-3z"/></svg></div>
       <div class="n">${state.announcements.length}</div><div class="l">Anuncios publicados</div>
     </div>
   `;
+  document.querySelectorAll('#statCards [data-goto]').forEach(el=>{
+    el.addEventListener('click', ()=> showView(el.dataset.goto));
+  });
 
   const up5 = upcoming.slice(0,5);
   document.getElementById('dashUpcoming').innerHTML = up5.length ? up5.map(e=>`
@@ -1004,9 +1172,9 @@ function renderPlayers(){
   }).sort((a,b)=> (a.jersey_number||99)-(b.jersey_number||99));
 
   document.getElementById('playerGrid').innerHTML = list.length ? list.map(p=>`
-    <div class="player-card">
+    <div class="player-card" onclick="openPlayerModal('${p.id}')">
       <div class="player-top">
-        <div class="avatar">${initials(p.full_name)}</div>
+        <div class="avatar">${p.photo_url ? `<img src="${escapeHtml(p.photo_url)}" alt="">` : initials(p.full_name)}</div>
         <div>
           <div class="pname">${escapeHtml(p.full_name)}</div>
           <div class="pnum">#${p.jersey_number ?? '--'} · ${p.position}</div>
@@ -1015,11 +1183,7 @@ function renderPlayers(){
       <div class="player-tags">${p.active===false?'<span class="pill normal">Inactivo</span>':''}</div>
       <div class="player-info">
         ${p.phone?`<div>📞 ${escapeHtml(p.phone)}</div>`:''}
-        ${p.email?`<div>✉️ ${escapeHtml(p.email)}</div>`:''}
-        ${p.notes?`<div>📝 ${escapeHtml(p.notes)}</div>`:''}
-      </div>
-      <div class="player-actions coach-only" style="${isCoach()?'':'display:none;'}">
-        <button class="btn secondary sm" onclick="openPlayerModal('${p.id}')">Editar</button>
+        ${(p.goals||p.assists)?`<div>⚽ ${p.goals||0} goles · 🅰️ ${p.assists||0} asist.</div>`:''}
       </div>
     </div>
   `).join('') : `<div class="empty" style="grid-column:1/-1;"><div class="big">No hay jugadores</div>${isCoach()?'Agrega tu primer jugador con el botón de arriba.':'El coach aún no ha agregado jugadores.'}</div>`;
@@ -1028,30 +1192,54 @@ document.getElementById('playerSearch').addEventListener('input', renderPlayers)
 document.getElementById('positionFilter').addEventListener('change', renderPlayers);
 document.getElementById('addPlayerBtn').addEventListener('click', ()=>openPlayerModal(null));
 
+function canEditPlayer(p){
+  return isCoach() || (state.myProfile && p && state.myProfile.player_id === p.id);
+}
+
 function openPlayerModal(id){
-  if(!isCoach()) return;
-  const modal = document.getElementById('playerModal');
+  const p = id ? playerById(id) : null;
+  if(id && !p) return;
+  if(!id && !isCoach()) return; // solo el coach agrega jugadores nuevos desde aquí
+  const editable = id ? canEditPlayer(p) : true;
+
   document.getElementById('playerId').value = id||'';
+  document.getElementById('fichaPhotoRow').style.display = id ? '' : 'none';
+  document.getElementById('fichaStatsRow').style.display = id ? '' : 'none';
+  document.getElementById('savePlayerBtn').style.display = editable ? '' : 'none';
+  document.getElementById('deletePlayerBtn').style.display = (id && isCoach()) ? '' : 'none';
+
   if(id){
-    const p = playerById(id);
-    document.getElementById('playerModalTitle').textContent = 'Editar jugador';
+    document.getElementById('playerModalTitle').textContent = editable ? 'Editar jugador' : p.full_name;
     document.getElementById('pName').value = p.full_name;
     document.getElementById('pNumber').value = p.jersey_number ?? '';
     document.getElementById('pPosition').value = p.position;
+    document.getElementById('pDob').value = p.date_of_birth || '';
+    document.getElementById('pHeight').value = p.height_cm ?? '';
     document.getElementById('pPhone').value = p.phone||'';
     document.getElementById('pEmail').value = p.email||'';
     document.getElementById('pNotes').value = p.notes||'';
     document.getElementById('pActive').checked = p.active !== false;
-    document.getElementById('deletePlayerBtn').style.display='';
+    document.getElementById('statGoals').textContent = p.goals||0;
+    document.getElementById('statAssists').textContent = p.assists||0;
+    document.getElementById('fichaAvatar').innerHTML = p.photo_url ? `<img src="${escapeHtml(p.photo_url)}" alt="">` : initials(p.full_name);
+    document.getElementById('fichaPhotoActions').style.display = (isCoach() || (state.myProfile && state.myProfile.player_id===p.id)) ? '' : 'none';
+    document.getElementById('statGoalsStepper').style.display = isCoach() ? '' : 'none';
+    document.getElementById('statAssistsStepper').style.display = isCoach() ? '' : 'none';
   } else {
     document.getElementById('playerModalTitle').textContent = 'Nuevo jugador';
-    ['pName','pNumber','pPhone','pEmail','pNotes'].forEach(id=>document.getElementById(id).value='');
+    ['pName','pNumber','pPhone','pEmail','pNotes','pDob','pHeight'].forEach(fid=>document.getElementById(fid).value='');
     document.getElementById('pPosition').value='Portero';
     document.getElementById('pActive').checked = true;
-    document.getElementById('deletePlayerBtn').style.display='none';
   }
-  modal.classList.add('open');
+
+  // Habilita/deshabilita campos según permisos
+  ['pName','pNumber','pPosition','pDob','pHeight','pPhone','pEmail','pNotes','pActive'].forEach(fid=>{
+    document.getElementById(fid).disabled = !editable;
+  });
+
+  document.getElementById('playerModal').classList.add('open');
 }
+
 document.getElementById('savePlayerBtn').addEventListener('click', async ()=>{
   const full_name = document.getElementById('pName').value.trim();
   if(!full_name){ toast('El nombre es obligatorio.'); return; }
@@ -1060,6 +1248,8 @@ document.getElementById('savePlayerBtn').addEventListener('click', async ()=>{
     full_name,
     jersey_number: document.getElementById('pNumber').value ? Number(document.getElementById('pNumber').value) : null,
     position: document.getElementById('pPosition').value,
+    date_of_birth: document.getElementById('pDob').value || null,
+    height_cm: document.getElementById('pHeight').value ? Number(document.getElementById('pHeight').value) : null,
     phone: document.getElementById('pPhone').value.trim(),
     email: document.getElementById('pEmail').value.trim(),
     notes: document.getElementById('pNotes').value.trim(),
@@ -1077,16 +1267,61 @@ document.getElementById('deletePlayerBtn').addEventListener('click', async ()=>{
   closeAllModals(); await loadAll(); render();
 });
 
+/* Goles / asistencias: solo el coach mueve el contador, se guarda al toque */
+document.addEventListener('click', async (e)=>{
+  const btn = e.target.closest('.ficha-stat .stepper button');
+  if(!btn || !isCoach()) return;
+  const id = document.getElementById('playerId').value;
+  if(!id) return;
+  const stat = btn.dataset.stat; // 'goals' | 'assists'
+  const delta = Number(btn.dataset.delta);
+  const p = playerById(id);
+  const current = (stat==='goals' ? p.goals : p.assists) || 0;
+  const next = Math.max(0, current + delta);
+  const { error } = await sb.from('players').update({ [stat]: next }).eq('id', id);
+  if(error){ toast('Error al actualizar: '+error.message); return; }
+  document.getElementById(stat==='goals'?'statGoals':'statAssists').textContent = next;
+  await loadAll();
+});
+
+/* Subir foto de perfil (cámara o galería) */
+document.getElementById('fichaPhotoInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  const id = document.getElementById('playerId').value;
+  if(!file || !id) return;
+  const ext = file.name.split('.').pop() || 'jpg';
+  const path = `${id}/avatar.${ext}`;
+  const { error: upErr } = await sb.storage.from('player-photos').upload(path, file, { upsert: true, cacheControl: '3600' });
+  if(upErr){ toast('No se pudo subir la foto: '+upErr.message); return; }
+  const { data: pub } = sb.storage.from('player-photos').getPublicUrl(path);
+  const photo_url = pub.publicUrl + '?t=' + Date.now(); // evita caché vieja
+  const { error: updErr } = await sb.from('players').update({ photo_url }).eq('id', id);
+  if(updErr){ toast('Foto subida pero no se pudo guardar: '+updErr.message); return; }
+  document.getElementById('fichaAvatar').innerHTML = `<img src="${photo_url}" alt="">`;
+  await loadAll();
+});
+
 /* ---------- 11. Formación ---------- */
 function initFormationControls(){
   const sel = document.getElementById('formationType');
-  sel.innerHTML = Object.keys(FORMATIONS).map(k=>`<option value="${k}">${k}</option>`).join('');
+  sel.innerHTML = Object.keys(formationSetFor(currentFormationMode)).map(k=>`<option value="${k}">${k}</option>`).join('');
   sel.value = currentFormationDraft.type;
 }
 initFormationControls();
 document.getElementById('formationType').addEventListener('change', e=>{
   currentFormationDraft = { type: e.target.value, formationId:null };
   draftAssignments = {};
+  renderFormationView();
+});
+document.getElementById('modeToggle').addEventListener('click', e=>{
+  const btn = e.target.closest('button[data-mode]');
+  if(!btn) return;
+  currentFormationMode = btn.dataset.mode;
+  document.querySelectorAll('#modeToggle button').forEach(b=> b.classList.toggle('active', b===btn));
+  const firstType = Object.keys(formationSetFor(currentFormationMode))[0];
+  currentFormationDraft = { type: firstType, formationId:null };
+  draftAssignments = {};
+  initFormationControls();
   renderFormationView();
 });
 document.getElementById('clearFormationBtn').addEventListener('click', ()=>{
@@ -1108,7 +1343,7 @@ function renderFormationView(){
   document.getElementById('formationLockNote').style.display = isCoach() ? 'none' : '';
   renderFormationEventSelect();
   const type = currentFormationDraft.type;
-  const slots = FORMATIONS[type];
+  const slots = getFormationSlots(type);
   const assignments = draftAssignments;
   const pitch = document.getElementById('pitch');
 
@@ -1130,7 +1365,7 @@ function renderFormationView(){
     const filled = !!p;
     return `
       <div class="slot ${filled?'filled':'empty'} ${isCoach()?'':'locked'}" style="left:${s.x}%;top:${s.y}%;" data-slot="${s.id}">
-        <div class="badge">${filled ? (p.jersey_number ?? initials(p.full_name)) : '+'}</div>
+        <div class="badge">${filled ? (p.photo_url ? `<img src="${escapeHtml(p.photo_url)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : (p.jersey_number ?? initials(p.full_name))) : '+'}</div>
         ${filled ? `<div class="sname">${escapeHtml(p.full_name.split(' ')[0])}</div><div class="spos">${s.label}</div>` : `<div class="spos">${s.label}</div>`}
       </div>`;
   }).join('');
@@ -1153,7 +1388,7 @@ function renderFormationView(){
 function openPicker(slotId){
   if(!isCoach()) return;
   pendingSlot = slotId;
-  const slotInfo = FORMATIONS[currentFormationDraft.type].find(s=>s.id===slotId);
+  const slotInfo = getFormationSlots(currentFormationDraft.type).find(s=>s.id===slotId);
   const currentPid = draftAssignments[slotId];
   document.getElementById('pickerTitle').textContent = `Posición: ${slotInfo.label}`;
 
@@ -1219,6 +1454,9 @@ function renderSavedFormations(){
 function loadFormation(id){
   const f = state.formations.find(x=>x.id===id);
   if(!f) return;
+  currentFormationMode = modeOfFormationType(f.formation_type);
+  document.querySelectorAll('#modeToggle button').forEach(b=> b.classList.toggle('active', b.dataset.mode===currentFormationMode));
+  initFormationControls();
   currentFormationDraft = { type:f.formation_type, formationId:f.id };
   draftAssignments = {};
   state.formationAssignments.filter(a=>a.formation_id===id).forEach(a=>{ if(a.player_id) draftAssignments[a.slot_id]=a.player_id; });
