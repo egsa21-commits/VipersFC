@@ -485,6 +485,10 @@ body{overflow-x:hidden;}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l17-7-6 18-4-8-7-3z"/></svg>
         Anuncios
       </button>
+      <button data-view="activity" class="support-only" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
+        Actividad
+      </button>
     </nav>
     <div class="sidebar-foot" id="sidebarFoot">Conectado a Supabase.<br>Version 1.0 · MVP</div>
   </aside>
@@ -615,6 +619,20 @@ body{overflow-x:hidden;}
       <div class="grid grid-3" id="announceGrid"></div>
     </section>
 
+    <!-- ACTIVITY (solo soporte) -->
+    <section id="view-activity" class="view" style="display:none;">
+      <div class="topbar">
+        <div><h1>Actividad reciente</h1><p>Panel de soporte — registro de cambios en toda la app. No visible para jugadores ni coach.</p></div>
+        <button class="btn secondary sm" id="refreshActivityBtn">🔄 Actualizar</button>
+      </div>
+      <div class="card table-scroll">
+        <table class="att-table" id="activityTable">
+          <thead><tr><th>Fecha</th><th>Quién</th><th>Tabla</th><th>Acción</th><th>Detalle</th></tr></thead>
+          <tbody id="activityTbody"></tbody>
+        </table>
+      </div>
+    </section>
+
     <footer class="credit">Vipers FC · Spokane, WA — Sistema de gestión de equipo</footer>
   </main>
 </div>
@@ -689,6 +707,13 @@ body{overflow-x:hidden;}
         <label>Enlace de Google Maps (opcional)</label>
         <input id="eMapUrl" placeholder="https://maps.google.com/...">
         <div style="font-size:11.5px;color:var(--gray-dim);margin-top:2px;">Si lo dejas vacío, se genera un enlace automático con la ubicación de arriba (Spokane, WA por defecto).</div>
+      </div>
+      <div id="eScoreBlock" style="display:none;">
+        <div class="field"><label>Rival</label><input id="eOpponent" placeholder="Ej. Union FC"></div>
+        <div class="field-row">
+          <div class="field"><label>Nuestros goles</label><input id="eOurScore" type="number" min="0" placeholder="—"></div>
+          <div class="field"><label>Goles del rival</label><input id="eOpponentScore" type="number" min="0" placeholder="—"></div>
+        </div>
       </div>
       <div class="field"><label>Notas</label><textarea id="eNotes" placeholder="Opcional"></textarea></div>
       <div class="field">
@@ -862,6 +887,7 @@ function modeOfFormationType(type){ return FORMATIONS_7[type] ? '7' : '11'; }
 
 /* ---------- 3. Utilidades ---------- */
 function isCoach(){ return state.myProfile && state.myProfile.role === 'coach'; }
+function isSupport(){ return state.myProfile && state.myProfile.role === 'support'; }
 function activePlayers(){ return state.players.filter(p=>p.active !== false); }
 function playerById(id){ return state.players.find(p=>p.id===id); }
 function eventById(id){ return state.events.find(e=>e.id===id); }
@@ -994,11 +1020,12 @@ async function enterApp(){
   document.getElementById('appRoot').style.display='';
   await loadAll();
   updateModeBanner();
+  if(isSupport()){ showView('activity'); return; }
   render();
   subscribeRealtime();
 }
 
-/* ---------- 5. PIN del coach (validado en el servidor, vía Edge Function) ---------- */
+/* ---------- 5. PIN del coach / soporte (validado en el servidor, vía Edge Function) ---------- */
 async function tryVerifyPin(pin){
   const { data, error } = await sb.functions.invoke('verify-pin', { body: { pin } });
   if(error){
@@ -1009,11 +1036,11 @@ async function tryVerifyPin(pin){
     console.warn('verify-pin: rechazado', data);
     return { ok:false, message: (data && data.error) ? data.error : 'No se pudo validar el PIN.' };
   }
-  // refresca mi perfil (ya debería tener role='coach')
+  // refresca mi perfil (ya debería tener role='coach' o 'support', según cuál PIN coincidió)
   const { data: { user } } = await sb.auth.getUser();
   const { data: profile } = await sb.from('profiles').select('*').eq('auth_user_id', user.id).single();
   state.myProfile = profile;
-  return { ok:true };
+  return { ok:true, role: data.role };
 }
 document.getElementById('coachUnlockBtn').addEventListener('click', ()=>{
   document.getElementById('coachPinInput').value='';
@@ -1028,26 +1055,30 @@ document.getElementById('confirmPinBtn').addEventListener('click', async ()=>{
   if(!result.ok){ errBox.textContent = result.message; errBox.style.display=''; return; }
   closeAllModals();
   updateModeBanner();
+  if(isSupport()){ showView('activity'); return; }
   render();
 });
 document.getElementById('coachLockBtn').addEventListener('click', async ()=>{
+  const wasSupport = isSupport();
   const { error } = await sb.rpc('revert_to_player');
-  if(error){ toast('No se pudo salir de modo coach: '+error.message); return; }
+  if(error){ toast('No se pudo salir: '+error.message); return; }
   const { data: { user } } = await sb.auth.getUser();
   const { data: profile } = await sb.from('profiles').select('*').eq('auth_user_id', user.id).single();
   state.myProfile = profile;
   updateModeBanner();
-  render();
+  if(wasSupport) showView('dashboard'); else render();
 });
 function updateModeBanner(){
   const banner = document.getElementById('modeBanner');
   const coach = isCoach();
-  banner.classList.toggle('coach', coach);
+  const support = isSupport();
+  banner.classList.toggle('coach', coach || support);
   document.getElementById('whoText').textContent = state.myProfile ? state.myProfile.display_name : '';
-  document.getElementById('rolePill').textContent = coach ? 'coach' : 'jugador';
-  document.getElementById('coachUnlockBtn').style.display = coach ? 'none' : '';
-  document.getElementById('coachLockBtn').style.display = coach ? '' : 'none';
+  document.getElementById('rolePill').textContent = support ? 'soporte' : (coach ? 'coach' : 'jugador');
+  document.getElementById('coachUnlockBtn').style.display = (coach || support) ? 'none' : '';
+  document.getElementById('coachLockBtn').style.display = (coach || support) ? '' : 'none';
   document.querySelectorAll('.coach-only').forEach(el=> el.style.display = coach ? '' : 'none');
+  document.querySelectorAll('.support-only').forEach(el=> el.style.display = support ? '' : 'none');
 }
 
 /* ---------- 6. Cargar todo desde Supabase ---------- */
@@ -1084,7 +1115,7 @@ function subscribeRealtime(){
 }
 
 /* ---------- 7. Navegación ---------- */
-const views = ['dashboard','players','formation','events','attendance','announcements'];
+const views = ['dashboard','players','formation','events','attendance','announcements','activity'];
 function showView(name){
   views.forEach(v=> document.getElementById('view-'+v).style.display = (v===name)?'':'none');
   document.querySelectorAll('#navlinks button').forEach(b=> b.classList.toggle('active', b.dataset.view===name));
@@ -1116,6 +1147,7 @@ function render(){
   if(visible==='events') renderEvents();
   if(visible==='attendance') renderAttendance();
   if(visible==='announcements') renderAnnouncements();
+  if(visible==='activity') renderActivity();
 }
 
 /* ---------- 9. Dashboard ---------- */
@@ -1491,6 +1523,18 @@ function mapLinkFor(e){
   const query = encodeURIComponent(e.location.toLowerCase().includes('spokane') ? e.location : `${e.location}, Spokane, WA`);
   return `https://www.google.com/maps/search/?api=1&query=${query}`;
 }
+function resultBlock(e){
+  if(!['Partido','Torneo'].includes(e.type)) return '';
+  if(e.our_score==null || e.opponent_score==null) return e.opponent ? `<div class="event-meta"><span>🆚 ${escapeHtml(e.opponent)}</span></div>` : '';
+  const diff = e.our_score - e.opponent_score;
+  const cls = diff>0?'game':diff<0?'urgent':'normal';
+  const label = diff>0?'GANADO':diff<0?'PERDIDO':'EMPATE';
+  return `<div class="event-meta">
+    <span>🆚 ${e.opponent?escapeHtml(e.opponent):'Rival'}</span>
+    <span class="pill ${cls}">${label}</span>
+    <span style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;">${e.our_score} - ${e.opponent_score}</span>
+  </div>`;
+}
 function renderEvents(){
   const typeFilter = document.getElementById('eventTypeFilter').value;
   let list = state.events.filter(e=> !typeFilter || e.type===typeFilter)
@@ -1509,6 +1553,7 @@ function renderEvents(){
         ${e.event_time?`<span>🕒 ${fmtTime(e.event_time)}</span>`:''}
       </div>
       ${e.location?`<div class="event-meta"><span>📍 ${map?`<a href="${map}" target="_blank" rel="noopener" style="color:var(--blue-300);">${escapeHtml(e.location)}</a>`:escapeHtml(e.location)}</span></div>`:''}
+      ${resultBlock(e)}
       ${e.notes?`<div style="font-size:12.5px;color:var(--gray);">${escapeHtml(e.notes)}</div>`:''}
       <div class="event-actions coach-only" style="${isCoach()?'':'display:none;'}">
         <button class="btn secondary sm" onclick="openEventModal('${e.id}')">Editar</button>
@@ -1522,6 +1567,10 @@ function renderEvents(){
 }
 document.getElementById('eventTypeFilter').addEventListener('change', renderEvents);
 document.getElementById('addEventBtn').addEventListener('click', ()=>openEventModal(null));
+document.getElementById('eType').addEventListener('change', ()=>{
+  const showScore = ['Partido','Torneo'].includes(document.getElementById('eType').value);
+  document.getElementById('eScoreBlock').style.display = showScore ? '' : 'none';
+});
 function goToAttendance(eventId){
   showView('attendance');
   document.getElementById('attendanceEventSelect').value = eventId;
@@ -1542,6 +1591,9 @@ function openEventModal(id){
     document.getElementById('eTime').value = e.event_time||'';
     document.getElementById('eLocation').value = e.location||'';
     document.getElementById('eMapUrl').value = e.map_url||'';
+    document.getElementById('eOpponent').value = e.opponent||'';
+    document.getElementById('eOurScore').value = e.our_score ?? '';
+    document.getElementById('eOpponentScore').value = e.opponent_score ?? '';
     document.getElementById('eNotes').value = e.notes||'';
     if(e.image_url){
       document.getElementById('eImagePreview').src = e.image_url;
@@ -1552,10 +1604,11 @@ function openEventModal(id){
     // se genera el id desde ya, para poder subir la imagen antes de guardar
     document.getElementById('eventId').value = crypto.randomUUID();
     document.getElementById('eventModalTitle').textContent='Nuevo evento';
-    ['eTitle','eDate','eTime','eLocation','eMapUrl','eNotes'].forEach(fid=>document.getElementById(fid).value='');
+    ['eTitle','eDate','eTime','eLocation','eMapUrl','eNotes','eOpponent','eOurScore','eOpponentScore'].forEach(fid=>document.getElementById(fid).value='');
     document.getElementById('eType').value='Entrenamiento';
     document.getElementById('deleteEventBtn').style.display='none';
   }
+  document.getElementById('eScoreBlock').style.display = ['Partido','Torneo'].includes(document.getElementById('eType').value) ? '' : 'none';
   modal.classList.add('open');
 }
 document.getElementById('eImageInput').addEventListener('change', async (e)=>{
@@ -1584,6 +1637,9 @@ document.getElementById('saveEventBtn').addEventListener('click', async ()=>{
     event_time: document.getElementById('eTime').value || null,
     location: document.getElementById('eLocation').value.trim(),
     map_url: document.getElementById('eMapUrl').value.trim() || null,
+    opponent: document.getElementById('eOpponent').value.trim() || null,
+    our_score: document.getElementById('eOurScore').value !== '' ? Number(document.getElementById('eOurScore').value) : null,
+    opponent_score: document.getElementById('eOpponentScore').value !== '' ? Number(document.getElementById('eOpponentScore').value) : null,
     notes: document.getElementById('eNotes').value.trim(),
   };
   if(uploadedUrl) data.image_url = uploadedUrl;
@@ -1809,6 +1865,37 @@ function attachCommentHandlers(){
     });
   });
 }
+
+/* ---------- 16. Actividad reciente (panel de soporte) ---------- */
+function fmtDateTime(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleString('es-MX', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+}
+const ACTION_LABEL = { INSERT:'Creó', UPDATE:'Editó', DELETE:'Eliminó' };
+const TABLE_LABEL = {
+  players:'Jugadores', events:'Eventos', announcements:'Anuncios', attendance:'Asistencia',
+  comments:'Comentarios', formations:'Formaciones', profiles:'Perfiles (nuevo ingreso)'
+};
+async function renderActivity(){
+  if(!isSupport()){ return; }
+  const { data, error } = await sb.from('activity_log').select('*').order('created_at', {ascending:false}).limit(200);
+  const tbody = document.getElementById('activityTbody');
+  if(error){ tbody.innerHTML = `<tr><td colspan="5" class="empty" style="border:none;">Error al cargar: ${escapeHtml(error.message)}</td></tr>`; return; }
+  if(!data.length){ tbody.innerHTML = `<tr><td colspan="5" class="empty" style="border:none;">Sin actividad registrada todavía.</td></tr>`; return; }
+  tbody.innerHTML = data.map(row=>{
+    const prof = profileById(row.profile_id);
+    const who = prof ? prof.display_name : '—';
+    return `<tr>
+      <td>${fmtDateTime(row.created_at)}</td>
+      <td>${escapeHtml(who)}</td>
+      <td>${TABLE_LABEL[row.table_name] || row.table_name}</td>
+      <td>${ACTION_LABEL[row.action] || row.action}</td>
+      <td>${escapeHtml(row.summary || '—')}</td>
+    </tr>`;
+  }).join('');
+}
+document.getElementById('refreshActivityBtn').addEventListener('click', async ()=>{ await loadAll(); renderActivity(); });
 
 /* ---------- 16. Arranque ---------- */
 initSession();
