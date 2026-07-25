@@ -685,7 +685,20 @@ body{overflow-x:hidden;}
         <div class="field"><label>Hora</label><input id="eTime" type="time"></div>
       </div>
       <div class="field"><label>Ubicación</label><input id="eLocation" placeholder="Ej. Spokane Sports Complex - Cancha 3"></div>
+      <div class="field">
+        <label>Enlace de Google Maps (opcional)</label>
+        <input id="eMapUrl" placeholder="https://maps.google.com/...">
+        <div style="font-size:11.5px;color:var(--gray-dim);margin-top:2px;">Si lo dejas vacío, se genera un enlace automático con la ubicación de arriba (Spokane, WA por defecto).</div>
+      </div>
       <div class="field"><label>Notas</label><textarea id="eNotes" placeholder="Opcional"></textarea></div>
+      <div class="field">
+        <label>Imagen del evento (opcional)</label>
+        <div id="eImagePreviewWrap" style="display:none;margin-bottom:8px;">
+          <img id="eImagePreview" style="max-width:100%;border-radius:10px;border:1px solid var(--line);">
+        </div>
+        <label class="btn secondary sm" for="eImageInput" style="cursor:pointer;display:inline-flex;">📷 Subir imagen</label>
+        <input type="file" id="eImageInput" accept="image/*" style="display:none;">
+      </div>
     </div>
     <div class="modal-foot">
       <button class="btn danger" id="deleteEventBtn" style="display:none;margin-right:auto;">Eliminar</button>
@@ -1176,8 +1189,8 @@ function renderPlayers(){
       <div class="player-top">
         <div class="avatar">${p.photo_url ? `<img src="${escapeHtml(p.photo_url)}" alt="">` : initials(p.full_name)}</div>
         <div>
-          <div class="pname">${escapeHtml(p.full_name)}</div>
-          <div class="pnum">#${p.jersey_number ?? '--'} · ${p.position}</div>
+          <div class="pname">${escapeHtml(p.full_name)} ${p.is_head_coach?'<span class="pill practice">🎖️ Coach</span>':''}</div>
+          <div class="pnum">#${p.jersey_number ?? '--'} · ${p.position || 'Sin posición'}</div>
         </div>
       </div>
       <div class="player-tags">${p.active===false?'<span class="pill normal">Inactivo</span>':''}</div>
@@ -1212,7 +1225,7 @@ function openPlayerModal(id){
     document.getElementById('playerModalTitle').textContent = editable ? 'Editar jugador' : p.full_name;
     document.getElementById('pName').value = p.full_name;
     document.getElementById('pNumber').value = p.jersey_number ?? '';
-    document.getElementById('pPosition').value = p.position;
+    document.getElementById('pPosition').value = p.position || 'Mediocampista';
     document.getElementById('pDob').value = p.date_of_birth || '';
     document.getElementById('pHeight').value = p.height_cm ?? '';
     document.getElementById('pPhone').value = p.phone||'';
@@ -1379,7 +1392,7 @@ function renderFormationView(){
   const bench = activePlayers().filter(p=>!assignedIds.has(p.id)).sort((a,b)=>(a.jersey_number||99)-(b.jersey_number||99));
   document.getElementById('benchCount').textContent = bench.length;
   document.getElementById('benchList').innerHTML = bench.length ? bench.map(p=>`
-    <div class="bench-chip"><div class="num">${p.jersey_number ?? '-'}</div>${escapeHtml(p.full_name)} <span style="margin-left:auto;color:var(--gray-dim);font-size:11px;">${p.position}</span></div>
+    <div class="bench-chip"><div class="num">${p.jersey_number ?? '-'}</div>${escapeHtml(p.full_name)} <span style="margin-left:auto;color:var(--gray-dim);font-size:11px;">${p.position || ''}</span></div>
   `).join('') : `<div class="empty" style="padding:20px 10px;">Todos los jugadores activos están en el tablero.</div>`;
 
   renderSavedFormations();
@@ -1397,7 +1410,7 @@ function openPicker(slotId){
                                     .sort((a,b)=>(a.jersey_number||99)-(b.jersey_number||99));
 
   document.getElementById('pickerList').innerHTML = available.length ? available.map(p=>`
-    <div class="picker-item" data-pid="${p.id}"><div class="num">${p.jersey_number ?? '-'}</div>${escapeHtml(p.full_name)} <span style="margin-left:auto;color:var(--gray-dim);font-size:11px;">${p.position}</span></div>
+    <div class="picker-item" data-pid="${p.id}"><div class="num">${p.jersey_number ?? '-'}</div>${escapeHtml(p.full_name)} <span style="margin-left:auto;color:var(--gray-dim);font-size:11px;">${p.position || ''}</span></div>
   `).join('') : `<div class="empty">No hay jugadores disponibles.</div>`;
 
   document.getElementById('pickerList').querySelectorAll('.picker-item').forEach(el=>{
@@ -1472,12 +1485,21 @@ async function deleteFormation(id){
 }
 
 /* ---------- 12. Eventos ---------- */
+function mapLinkFor(e){
+  if(e.map_url) return e.map_url;
+  if(!e.location) return null;
+  const query = encodeURIComponent(e.location.toLowerCase().includes('spokane') ? e.location : `${e.location}, Spokane, WA`);
+  return `https://www.google.com/maps/search/?api=1&query=${query}`;
+}
 function renderEvents(){
   const typeFilter = document.getElementById('eventTypeFilter').value;
   let list = state.events.filter(e=> !typeFilter || e.type===typeFilter)
                           .sort((a,b)=> new Date(a.event_date+'T'+(a.event_time||'00:00')) - new Date(b.event_date+'T'+(b.event_time||'00:00')));
-  document.getElementById('eventGrid').innerHTML = list.length ? list.map(e=>`
+  document.getElementById('eventGrid').innerHTML = list.length ? list.map(e=>{
+    const map = mapLinkFor(e);
+    return `
     <div class="event-card">
+      ${e.image_url?`<img src="${escapeHtml(e.image_url)}" alt="" style="width:100%;border-radius:10px;margin-bottom:2px;object-fit:cover;max-height:160px;">`:''}
       <div class="event-head">
         <div class="et">${escapeHtml(e.title)}</div>
         <span class="pill ${typeClass(e.type)}">${e.type}</span>
@@ -1486,7 +1508,7 @@ function renderEvents(){
         <span>📅 ${fmtDate(e.event_date)}</span>
         ${e.event_time?`<span>🕒 ${fmtTime(e.event_time)}</span>`:''}
       </div>
-      ${e.location?`<div class="event-meta"><span>📍 ${escapeHtml(e.location)}</span></div>`:''}
+      ${e.location?`<div class="event-meta"><span>📍 ${map?`<a href="${map}" target="_blank" rel="noopener" style="color:var(--blue-300);">${escapeHtml(e.location)}</a>`:escapeHtml(e.location)}</span></div>`:''}
       ${e.notes?`<div style="font-size:12.5px;color:var(--gray);">${escapeHtml(e.notes)}</div>`:''}
       <div class="event-actions coach-only" style="${isCoach()?'':'display:none;'}">
         <button class="btn secondary sm" onclick="openEventModal('${e.id}')">Editar</button>
@@ -1494,7 +1516,8 @@ function renderEvents(){
       <div class="event-actions"><button class="btn secondary sm" onclick="goToAttendance('${e.id}')">Ver asistencia</button></div>
       ${renderCommentsBlock('event', e.id)}
     </div>
-  `).join('') : `<div class="empty" style="grid-column:1/-1;"><div class="big">No hay eventos</div>${isCoach()?'Crea un entrenamiento, partido o torneo.':'El coach aún no ha creado eventos.'}</div>`;
+  `;
+  }).join('') : `<div class="empty" style="grid-column:1/-1;"><div class="big">No hay eventos</div>${isCoach()?'Crea un entrenamiento, partido o torneo.':'El coach aún no ha creado eventos.'}</div>`;
   attachCommentHandlers();
 }
 document.getElementById('eventTypeFilter').addEventListener('change', renderEvents);
@@ -1507,39 +1530,73 @@ function goToAttendance(eventId){
 function openEventModal(id){
   if(!isCoach()) return;
   const modal = document.getElementById('eventModal');
-  document.getElementById('eventId').value = id||'';
+  document.getElementById('eImagePreviewWrap').style.display='none';
+  delete document.getElementById('eImageInput').dataset.uploadedUrl;
   if(id){
     const e = eventById(id);
+    document.getElementById('eventId').value = id;
     document.getElementById('eventModalTitle').textContent='Editar evento';
     document.getElementById('eTitle').value = e.title;
     document.getElementById('eType').value = e.type;
     document.getElementById('eDate').value = e.event_date;
     document.getElementById('eTime').value = e.event_time||'';
     document.getElementById('eLocation').value = e.location||'';
+    document.getElementById('eMapUrl').value = e.map_url||'';
     document.getElementById('eNotes').value = e.notes||'';
+    if(e.image_url){
+      document.getElementById('eImagePreview').src = e.image_url;
+      document.getElementById('eImagePreviewWrap').style.display='';
+    }
     document.getElementById('deleteEventBtn').style.display='';
   } else {
+    // se genera el id desde ya, para poder subir la imagen antes de guardar
+    document.getElementById('eventId').value = crypto.randomUUID();
     document.getElementById('eventModalTitle').textContent='Nuevo evento';
-    ['eTitle','eDate','eTime','eLocation','eNotes'].forEach(id=>document.getElementById(id).value='');
+    ['eTitle','eDate','eTime','eLocation','eMapUrl','eNotes'].forEach(fid=>document.getElementById(fid).value='');
     document.getElementById('eType').value='Entrenamiento';
     document.getElementById('deleteEventBtn').style.display='none';
   }
   modal.classList.add('open');
 }
+document.getElementById('eImageInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  const id = document.getElementById('eventId').value;
+  if(!file || !id) return;
+  const ext = file.name.split('.').pop() || 'jpg';
+  const path = `events/${id}/cover.${ext}`;
+  const { error: upErr } = await sb.storage.from('team-uploads').upload(path, file, { upsert:true, cacheControl:'3600' });
+  if(upErr){ toast('No se pudo subir la imagen: '+upErr.message); return; }
+  const { data: pub } = sb.storage.from('team-uploads').getPublicUrl(path);
+  const url = pub.publicUrl + '?t=' + Date.now();
+  document.getElementById('eImagePreview').src = url;
+  document.getElementById('eImagePreviewWrap').style.display='';
+  document.getElementById('eImageInput').dataset.uploadedUrl = url;
+});
 document.getElementById('saveEventBtn').addEventListener('click', async ()=>{
   const title = document.getElementById('eTitle').value.trim();
   const event_date = document.getElementById('eDate').value;
   if(!title || !event_date){ toast('Título y fecha son obligatorios.'); return; }
   const id = document.getElementById('eventId').value;
+  const isNew = !eventById(id);
+  const uploadedUrl = document.getElementById('eImageInput').dataset.uploadedUrl;
   const data = {
     title, type: document.getElementById('eType').value, event_date,
     event_time: document.getElementById('eTime').value || null,
     location: document.getElementById('eLocation').value.trim(),
+    map_url: document.getElementById('eMapUrl').value.trim() || null,
     notes: document.getElementById('eNotes').value.trim(),
   };
-  if(!id) data.created_by = state.myProfile.id;
-  const { error } = id ? await sb.from('events').update(data).eq('id', id) : await sb.from('events').insert(data);
+  if(uploadedUrl) data.image_url = uploadedUrl;
+  let error;
+  if(isNew){
+    data.id = id;
+    data.created_by = state.myProfile.id;
+    ({ error } = await sb.from('events').insert(data));
+  } else {
+    ({ error } = await sb.from('events').update(data).eq('id', id));
+  }
   if(error){ toast('Error al guardar: '+error.message); return; }
+  delete document.getElementById('eImageInput').dataset.uploadedUrl;
   closeAllModals(); await loadAll(); render();
 });
 document.getElementById('deleteEventBtn').addEventListener('click', async ()=>{
@@ -1607,7 +1664,7 @@ function renderAttendance(){
     return `
     <tr>
       <td>${escapeHtml(p.full_name)} <span style="color:var(--gray-dim);">#${p.jersey_number ?? '-'}</span></td>
-      <td>${p.position}</td>
+      <td>${p.position || '—'}</td>
       <td>
         <div class="status-btns">
           <button class="status-btn ${st==='attending'?'active attending':''}" ${dis} onclick="setAttendance('${p.id}','${eventId}','attending')">Asiste</button>
@@ -1675,19 +1732,36 @@ document.getElementById('deleteAnnounceBtn').addEventListener('click', async ()=
 });
 
 /* ---------- 15. Comentarios (anuncios y eventos) ---------- */
+const pendingCommentImages = {}; // "parentType:parentId" -> url subida, pendiente de enviar
+
+function linkify(escapedText){
+  return escapedText.replace(/(https?:\/\/[^\s<]+)/g, url =>
+    `<a href="${url}" target="_blank" rel="noopener" style="color:var(--blue-300);text-decoration:underline;word-break:break-all;">${url}</a>`
+  );
+}
+
 function renderCommentsBlock(parentType, parentId){
   const list = state.comments.filter(c=>c.parent_type===parentType && c.parent_id===parentId);
+  const key = parentType+':'+parentId;
   return `
     <div class="comments-box">
       <div class="comments-list">
         ${list.length ? list.map(c=>{
           const prof = profileById(c.profile_id);
           const name = prof ? prof.display_name : 'Alguien';
-          return `<div class="comment-row"><div class="cavatar">${initials(name)}</div><div class="ctext"><span class="cname">${escapeHtml(name)}: </span>${escapeHtml(c.message)}</div></div>`;
+          return `<div class="comment-row"><div class="cavatar">${initials(name)}</div><div class="ctext"><span class="cname">${escapeHtml(name)}: </span>${linkify(escapeHtml(c.message))}
+            ${c.image_url?`<div><img src="${escapeHtml(c.image_url)}" alt="" style="max-width:150px;border-radius:8px;margin-top:5px;display:block;"></div>`:''}
+          </div></div>`;
         }).join('') : `<div style="color:var(--gray-dim);font-size:12px;">Sin comentarios todavía.</div>`}
       </div>
+      <div id="pendingImg-${key.replace(':','-')}" style="display:none;margin-bottom:8px;">
+        <img style="max-width:80px;border-radius:8px;border:1px solid var(--line);">
+        <button class="comments-toggle remove-pending-img" data-key="${key}">Quitar foto</button>
+      </div>
       <div class="comment-form">
-        <input type="text" placeholder="Escribe un comentario..." data-ctype="${parentType}" data-cid="${parentId}" class="comment-input">
+        <label class="btn secondary sm" style="cursor:pointer;padding:8px 10px;" for="cimg-${key.replace(':','-')}">📷</label>
+        <input type="file" accept="image/*" style="display:none;" class="comment-image-input" id="cimg-${key.replace(':','-')}" data-ctype="${parentType}" data-cid="${parentId}">
+        <input type="text" placeholder="Escribe un comentario o pega un link..." data-ctype="${parentType}" data-cid="${parentId}" class="comment-input">
         <button class="comment-send" data-ctype="${parentType}" data-cid="${parentId}">Enviar</button>
       </div>
     </div>`;
@@ -1697,18 +1771,42 @@ function attachCommentHandlers(){
     btn.addEventListener('click', async ()=>{
       const input = btn.parentElement.querySelector('.comment-input');
       const message = input.value.trim();
-      if(!message) return;
+      const key = btn.dataset.ctype+':'+btn.dataset.cid;
+      const image_url = pendingCommentImages[key] || null;
+      if(!message && !image_url) return;
       const { error } = await sb.from('comments').insert({
         parent_type: btn.dataset.ctype, parent_id: btn.dataset.cid,
-        profile_id: state.myProfile.id, message
+        profile_id: state.myProfile.id, message: message || '📷', image_url
       });
       if(error){ toast('Error al comentar: '+error.message); return; }
+      delete pendingCommentImages[key];
       await loadAll();
       if(btn.dataset.ctype==='announcement') renderAnnouncements(); else renderEvents();
     });
   });
   document.querySelectorAll('.comment-input').forEach(inp=>{
     inp.addEventListener('keydown', e=>{ if(e.key==='Enter') inp.parentElement.querySelector('.comment-send').click(); });
+  });
+  document.querySelectorAll('.comment-image-input').forEach(inp=>{
+    inp.addEventListener('change', async (e)=>{
+      const file = e.target.files[0];
+      if(!file) return;
+      const key = inp.dataset.ctype+':'+inp.dataset.cid;
+      const ext = file.name.split('.').pop() || 'jpg';
+      const path = `comments/${state.myProfile.id}/${Date.now()}.${ext}`;
+      const { error: upErr } = await sb.storage.from('team-uploads').upload(path, file, { upsert:true, cacheControl:'3600' });
+      if(upErr){ toast('No se pudo subir la foto: '+upErr.message); return; }
+      const { data: pub } = sb.storage.from('team-uploads').getPublicUrl(path);
+      pendingCommentImages[key] = pub.publicUrl;
+      const wrap = document.getElementById('pendingImg-'+key.replace(':','-'));
+      if(wrap){ wrap.style.display=''; wrap.querySelector('img').src = pub.publicUrl; }
+    });
+  });
+  document.querySelectorAll('.remove-pending-img').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      delete pendingCommentImages[btn.dataset.key];
+      btn.closest('div').style.display='none';
+    });
   });
 }
 
